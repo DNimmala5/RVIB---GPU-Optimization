@@ -122,6 +122,31 @@ class FaissIndexBuildService(IndexBuildService):
                 f"{index_conversion_time:.2f} seconds"
             )
 
+            # === DEBUG: Check if CPU index contains vectors ===
+            try:
+                with open("faiss_cpu_index_vector_debug.log", "a") as f:
+                    f.write(f"==== Debug for vector_path {index_build_parameters.vector_path} ====\n")
+                    f.write(f"Index type: {type(faiss_cpu_build_index_output)}\n")
+                    ntotal = getattr(faiss_cpu_build_index_output, "ntotal", "N/A")
+                    f.write(f"ntotal: {ntotal}\n")
+                    # Try to access .xb (vector storage)
+                    xb = getattr(faiss_cpu_build_index_output, "xb", None)
+                    if xb is not None:
+                        f.write(f"xb shape: {getattr(xb, 'shape', 'N/A')}\n")
+                        # Optionally, print the first vector if available
+                        try:
+                            if hasattr(xb, "__getitem__") and len(xb) > 0:
+                                f.write(f"First vector: {xb[0]}\n")
+                            else:
+                                f.write("xb is present but appears empty or not indexable\n")
+                        except Exception as e:
+                            f.write(f"Error accessing xb[0]: {e}\n")
+                    else:
+                        f.write("No xb attribute found on CPU index (likely no vector storage present)\n")
+                    f.write("========================================\n")
+            except Exception as e:
+                logger.warning(f"Failed to log CPU index debug info: {e}")
+
             # Step 3: Write CPU Index to persistent storage
             t1 = timer()
             faiss_index_hnsw_cagra_builder.write_cpu_index(
