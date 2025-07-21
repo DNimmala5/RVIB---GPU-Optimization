@@ -25,19 +25,34 @@ RUN chown -R appuser:appuser /tmp
 USER appuser
 # Put conda in path so we can use conda activate
 ENV PATH=$CONDA_DIR/bin:$PATH
-#install some necessary dependencies
-RUN conda install -c conda-forge -y -q python=3.11 cmake=3.30.4 make=4.2 swig=4.0 "numpy<2" scipy=1.14 pytest=7.4 gflags=2.2
+
+# Accept Conda Terms of Service and set up environment
+RUN conda init bash && \
+    conda config --set channel_priority strict && \
+    conda config --add channels conda-forge && \
+    conda config --add channels rapidsai && \
+    conda config --add channels rapidsai-nightly && \
+    conda config --set always_yes true && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+# Install dependencies
+RUN conda install -c conda-forge -q python=3.11 cmake=3.30.4 make=4.2 swig=4.0 "numpy<2" scipy=1.14 pytest=7.4 gflags=2.2
+
 RUN cmake --version
 
 # set CUDA_ARCHS to use in cmake call in build script
 ENV CUDA_ARCHS "80;86-real"
 
-# install base packages for X86_64
-RUN conda install -y -q -c conda-forge gxx_linux-64=14.2 sysroot_linux-64=2.17
+# Accept ToS again before another conda install in a new layer
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    conda install -y -q -c conda-forge gxx_linux-64=14.2 sysroot_linux-64=2.17
 
-# install all the dependencies we need for installing faiss
-# Ref: https://github.com/facebookresearch/faiss/blob/main/.github/actions/build_cmake/action.yml#L64
-RUN conda install -y -q libcuvs=25.06 cuda-nvcc 'cuda-version>=12.0,<=12.5' cuda-toolkit=12.4.1 gxx_linux-64=12.4 -c rapidsai -c rapidsai-nightly -c conda-forge
+# Accept ToS again before final conda install
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    conda install -y -q libcuvs=25.06 cuda-nvcc 'cuda-version>=12.0,<=12.5' cuda-toolkit=12.4.1 gxx_linux-64=12.4 -c rapidsai -c rapidsai-nightly -c conda-forge
 
 # Execute steps to build faiss
 # Ref: https://github.com/facebookresearch/faiss/blob/main/INSTALL.md#step-1-invoking-cmake
